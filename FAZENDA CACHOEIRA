@@ -1,0 +1,7 @@
+cd "c:\Users\Lucas Fonseca\OneDrive - VIVIR AGRICOLA LTDA\Área de Trabalho\FAZENDA CACHOEIRA"
+git init
+git add .
+git commit -m "primeiro deploy"
+git branch -M main
+git remote add origin https://github.com/lucassilvafonseca-00-11/Fazenda-Cachoeira.git
+git push -u origin main
