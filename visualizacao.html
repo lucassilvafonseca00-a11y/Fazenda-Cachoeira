@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Fazenda Cachoeira | Visualização</title>
+  <link rel="stylesheet" href="styles.css?v=20260829-3" />
+  <link rel="stylesheet" href="visualizacao.css?v=20260829-3" />
+  <link rel="stylesheet" href="map.css?v=20260829-3" />
+</head>
+<body class="visualizacao-page">
+  <header class="topbar">
+    <div class="brand">
+      <img class="brand-logo" src="logo-vivir.jpeg" alt="VIVIR Agronegócios" />
+      <div>
+        <strong id="farm-title">Fazenda Cachoeira</strong>
+        <small>Visualização de aplicações</small>
+        <span id="header-date" class="header-date"></span>
+      </div>
+    </div>
+    <div class="farm-switcher">
+      <label for="farm-select">Fazenda</label>
+      <select id="farm-select">
+        <option value="cachoeira">Fazenda Cachoeira</option>
+        <option value="berrador">Fazenda Berrador</option>
+      </select>
+    </div>
+  </header>
+
+  <main class="shell">
+    <section class="intro">
+      <div>
+        <p class="eyebrow">CONTROLE AGRÍCOLA · SAFRA 2026/27</p>
+        <h1>Visualização operacional.</h1>
+      </div>
+    </section>
+
+    <section class="metrics" aria-label="Resumo da fazenda">
+      <article class="metric">
+        <span class="metric-label">Área cadastrada</span>
+        <strong id="total-area">497,31 ha</strong>
+        <span class="metric-note">14 talhões cadastrados</span>
+      </article>
+      <article class="metric accent">
+        <span class="metric-label">Aplicações registradas</span>
+        <strong id="application-count">0</strong>
+        <span class="metric-note">Neste dispositivo</span>
+      </article>
+    </section>
+
+    <section id="application-status" class="panel application-status" aria-live="polite"></section>
+
+    <div class="content-grid">
+      <section class="panel plots-panel">
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow">CADASTRO DA ÁREA</p>
+            <h2>Talhões</h2>
+          </div>
+          <span class="plot-count" id="plot-count">14 áreas</span>
+        </div>
+        <div class="plot-list" id="plot-list"></div>
+      </section>
+    </div>
+
+    <section class="panel history-panel">
+      <div class="panel-heading">
+        <div>
+          <p class="eyebrow">RASTREABILIDADE</p>
+          <h2>Histórico por talhão</h2>
+        </div>
+      </div>
+      <div id="history-plots" class="history-plots"></div>
+      <div id="history" class="history-empty">Clique em um talhão para ver as aplicações detalhadas.<br><span>Cada lote terá seu próprio histórico.</span></div>
+    </section>
+  </main>
+
+  <footer>Fazenda Cachoeira <span>·</span> dados salvos neste navegador</footer>
+  <script src="app.js?v=20260829-3"></script>
+</body>
+</html>
