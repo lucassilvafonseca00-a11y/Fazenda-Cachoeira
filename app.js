@@ -40,6 +40,7 @@ const defaultFarmId = urlParams.get('fazenda') || localStorage.getItem('fazenda-
 let currentFarm = farms[defaultFarmId] ? defaultFarmId : 'cachoeira';
 let plots = farms[currentFarm].plots;
 let farmApplications = [];
+let syncTimer;
 const farmCatalogKey = farmId => `fazenda-${farmId}-product-catalog`;
 const getCatalogKey = () => farmCatalogKey(currentFarm);
 const publicView = urlParams.get('view') === '1' || urlParams.get('mode') === 'read' || window.location.pathname.includes('visualizacao');
@@ -62,6 +63,8 @@ function currentApplications(){
   return Array.isArray(farmApplications) ? farmApplications : [];
 }
 
+const applications = currentApplications;
+
 function getCurrentFarmPlots(){
   return farms[currentFarm].plots;
 }
@@ -80,6 +83,17 @@ function setCurrentFarm(farmId){
 
 async function refreshFarmData(){
   await loadApplicationsForCurrentFarm();
+}
+
+function startBackgroundSync(){
+  window.clearInterval(syncTimer);
+  syncTimer = window.setInterval(async () => {
+    await refreshFarmData();
+    const selectedPlot = document.querySelector('.history-plot.selected')?.dataset.code || '';
+    renderHistory(selectedPlot);
+    renderApplicationStatus();
+    renderMap();
+  }, 20000);
 }
 function applyPublicReadOnlyLayout(){
   if (!publicView) return;
@@ -209,12 +223,14 @@ async function setup(){
     renderHistory(defaultPlot);
     renderApplicationStatus();
     updateTotal();
+    startBackgroundSync();
     return;
   }
 
   renderHistory();
   renderApplicationStatus();
   updateTotal();
+  startBackgroundSync();
 }
 function bindProductLine(line){const product=line.querySelector('.product');product.oninput=updateTotal;line.querySelector('.dose').oninput=updateTotal;}
 function addProductLine(){const line=document.querySelector('.product-line').cloneNode(true);line.querySelectorAll('input').forEach(input=>input.value='');line.querySelector('.line-total').textContent='0,00';line.querySelector('.remove-product').hidden=false;line.querySelector('.remove-product').onclick=()=>{line.remove();updateTotal()};bindProductLine(line);line.querySelector('.product').focus();$('product-lines').appendChild(line);}
@@ -238,13 +254,23 @@ function updateTotal(){
   const applicationCheck = $('application-check');
   if (applicationCheck && !applicationCheck.hidden) renderApplicationCheck();
 }
-function saveApplication(event){
+async function saveApplication(event){
   event.preventDefault();
-  const storageKeyForFarm = getStorageKey();
   const p=plots.find(x=>x.code===$('plot').value);
   const products=[...document.querySelectorAll('.product-line')].map(line=>({product:line.querySelector('.product').value,unit:line.querySelector('.unit').value,dose:Number(line.querySelector('.dose').value)||0})).filter(item=>item.product);
   const item={date:$('date').value,plot:p.code,crop:p.crop,type:$('type').value,products,responsible:$('responsible').value,notes:$('notes').value,farm:currentFarm};
-  localStorage.setItem(storageKeyForFarm,JSON.stringify([item,...applications()]));
+  try {
+    const response = await fetch('/api/applications', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(item)
+    });
+    if (!response.ok) throw new Error('Falha ao salvar');
+    await refreshFarmData();
+  } catch (error) {
+    alert('Não foi possível sincronizar o lançamento. Verifique sua conexão e tente novamente.');
+    return;
+  }
   event.target.reset();
   $('product-lines').innerHTML=document.querySelector('.product-line').outerHTML;
   document.querySelector('.remove-product').hidden=true;
@@ -255,9 +281,14 @@ function saveApplication(event){
   updateTotal();
 }
 function renderHistory(selectedPlot=''){const all=applications();$('application-count').textContent=all.length;const plotsWithRecords=new Set(all.map(item=>item.plot));$('history-plots').innerHTML=plots.map(p=>`<button type="button" class="history-plot ${selectedPlot===p.code?'selected ':''}${plotsWithRecords.has(p.code)?'has-records':''}" data-code="${p.code}"><strong>${p.code}</strong><small>${p.area?formatNumber(p.area)+' ha':'28,00 ha'} · ${p.crop}</small><span>${all.filter(item=>item.plot===p.code).length} registro(s)</span></button>`).join('');$('history-plots').querySelectorAll('.history-plot').forEach(button=>button.onclick=()=>renderHistory(button.dataset.code));if(!selectedPlot){$('history').className='history-empty';$('history').innerHTML='Clique em um talhão para ver as aplicações detalhadas.<br><span>Cada lote tem seu próprio histórico.</span>';return}const plot=plots.find(item=>item.code===selectedPlot);const list=all.filter(item=>item.plot===selectedPlot);if(!list.length){$('history').className='history-empty';$('history').innerHTML=`Nenhuma aplicação registrada no ${selectedPlot}.<br><span>${plot?.crop||''} · ${plot?.area?formatNumber(plot.area)+' ha':'área do mapa'}</span>`;return}$('history').className='history-list';$('history').innerHTML=`<div class="history-detail-heading"><div><span class="eyebrow">TALHÃO SELECIONADO</span><h3>${selectedPlot}</h3></div><strong>${plot?.area?formatNumber(plot.area):'28,00'} ha · ${plot?.crop}</strong></div>`+list.map(item=>{const products=item.products||[{product:item.product,unit:item.unit,dose:item.dose,total:item.total}];const names=products.map(product=>product.product).join(', ');const doses=products.map(product=>`${formatNumber(product.dose)} ${product.unit}`).join(' · ');const total=products.reduce((sum,product)=>sum+(plot?.area?product.dose*plot.area:0),0);return `<div class="history-row"><small>${new Date(item.date+'T12:00:00').toLocaleDateString('pt-BR')}</small><div><strong>${names}</strong><small>${item.type} · ${item.responsible||'Sem responsável'}</small></div><div><small>Doses</small><br><strong>${doses}</strong></div><div class="history-dose">${formatNumber(total)} total</div><small>${item.notes||'Sem observações'}</small></div>`}).join('');}
-function clearHistory(){
-  if(confirm('Apagar todo o histórico desta fazenda neste dispositivo?')){
-    localStorage.removeItem(getStorageKey());
+async function clearHistory(){
+  if(confirm('Apagar todo o histórico desta fazenda?')){
+    const response = await fetch(`/api/applications?farm=${encodeURIComponent(currentFarm)}`, {method:'DELETE'});
+    if (!response.ok) {
+      alert('Não foi possível limpar o histórico.');
+      return;
+    }
+    await refreshFarmData();
     renderHistory();
     renderApplicationStatus();
   }
