@@ -232,14 +232,14 @@ async function setup(){
   updateTotal();
   startBackgroundSync();
 }
-function bindProductLine(line){const product=line.querySelector('.product');product.oninput=updateTotal;line.querySelector('.dose').oninput=updateTotal;}
+function bindProductLine(line){const product=line.querySelector('.product');product.oninput=updateTotal;line.querySelector('.total-used').oninput=updateTotal;}
 function addProductLine(){const line=document.querySelector('.product-line').cloneNode(true);line.querySelectorAll('input').forEach(input=>input.value='');line.querySelector('.line-total').textContent='0,00';line.querySelector('.remove-product').hidden=false;line.querySelector('.remove-product').onclick=()=>{line.remove();updateTotal()};bindProductLine(line);line.querySelector('.product').focus();$('product-lines').appendChild(line);}
 function renderApplicationStatus(){const all=currentApplications();const today=new Date();const cards=plots.map(plot=>{const latest=all.filter(item=>item.plot===plot.code).sort((a,b)=>b.date.localeCompare(a.date))[0];if(!latest)return `<div class="status-card pending"><strong>${plot.code}</strong><small>Sem aplicação registrada</small></div>`;const appliedDate=new Date(`${latest.date}T12:00:00`);const days=Math.max(0,Math.floor((today-appliedDate)/86400000));const status=days>15?'overdue':'recent';return `<div class="status-card ${status}"><strong>${plot.code}</strong><small>${days===0?'Aplicado hoje':`Aplicado há ${days} dia(s)`}</small><span>${status==='overdue'?'Mais de 20 dias':'Dentro de 15 dias'}</span></div>`;}).join('');$('application-status').innerHTML='<div class="status-heading"><span>Status das aplicações</span></div><div class="status-grid">'+cards+'</div><div class="status-legend"><small><i class="status-dot recent"></i>Até 15 dias <i class="status-dot overdue"></i>Mais de 20 dias</small></div>';}
 function renderCatalogOptions(){const options=[...new Map(productCatalog.map(item=>[item.commercial,item])).values()];document.querySelectorAll('#product-options').forEach(list=>list.innerHTML=options.map(item=>`<option value="${item.commercial}">${item.active} · ${item.manufacturer}</option>`).join(''));document.querySelectorAll('.catalog-status').forEach(status=>status.textContent=productCatalog.length?`${options.length} produtos disponíveis para pesquisa.`:'Carregue a lista de produtos para pesquisar.');}
 function parseCatalog(text){return text.split(/\r?\n/).slice(1).map(line=>line.split(';')).filter(parts=>parts.length>=3&&parts[0].trim()).map(parts=>({commercial:parts[0].trim(),active:parts[1].trim().replace(/�/g,'í'),manufacturer:parts[2].trim()}));}
 function loadCatalog(event){const file=event.target.files[0];if(!file)return;const reader=new FileReader();reader.onload=()=>{const text=new TextDecoder('windows-1252').decode(reader.result);productCatalog=parseCatalog(text);localStorage.setItem(catalogKey,JSON.stringify(productCatalog));renderCatalogOptions();};reader.onerror=()=>document.querySelectorAll('.catalog-status').forEach(status=>status.textContent='Não foi possível ler o arquivo CSV.');reader.readAsArrayBuffer(file);}
 function loadDefaultCatalog(){if(productCatalog.length)return;fetch('lista-produtos.csv').then(response=>response.ok?response.arrayBuffer():Promise.reject()).then(buffer=>{const text=new TextDecoder('windows-1252').decode(buffer);productCatalog=parseCatalog(text);if(!productCatalog.length)throw new Error('Catálogo vazio');localStorage.setItem(catalogKey,JSON.stringify(productCatalog));renderCatalogOptions();}).catch(()=>{productCatalog=starterCatalog;renderCatalogOptions();});}
-function renderApplicationCheck(){const p=plots.find(x=>x.code===$('plot').value);const area=p?.area||0;const rows=[...document.querySelectorAll('.product-line')].map(line=>{const name=line.querySelector('.product').value.trim()||'Produto não informado';const unit=line.querySelector('.unit').value;const dose=Number(line.querySelector('.dose').value)||0;const total=area*dose;return `<div class="check-row"><strong>${name}</strong><span>${formatNumber(dose)} ${unit}</span><span>${formatNumber(area)} ha × ${formatNumber(dose)} = <b>${formatNumber(total)} ${unit.replace('/ha','')}</b></span></div>`;}).join('');$('application-check').innerHTML=`<div class="check-heading"><strong>Conferência</strong><small>${p?`${p.code} · ${formatNumber(area)} ha`:'Selecione um talhão'}</small></div>${rows||'<small>Adicione um produto para conferir as quantidades.</small>'}`;}
+function renderApplicationCheck(){const p=plots.find(x=>x.code===$('plot').value);const area=p?.area||0;const rows=[...document.querySelectorAll('.product-line')].map(line=>{const name=line.querySelector('.product').value.trim()||'Produto não informado';const unit=line.querySelector('.unit').value;const total=Number(line.querySelector('.total-used').value)||0;const dose=area?total/area:0;return `<div class="check-row"><strong>${name}</strong><span>Total usado: ${formatNumber(total)} ${unit}</span><span>${formatNumber(total)} ${unit} ÷ ${formatNumber(area)} ha = <b>${formatNumber(dose)} ${unit}/ha</b></span></div>`;}).join('');$('application-check').innerHTML=`<div class="check-heading"><strong>Conferência</strong><small>${p?`${p.code} · ${formatNumber(area)} ha`:'Selecione um talhão'}</small></div>${rows||'<small>Adicione um produto para conferir as quantidades.</small>'}`;}
 function toggleApplicationCheck(){const panel=$('application-check');panel.hidden=!panel.hidden;if(!panel.hidden)renderApplicationCheck();}
 function updateTotal(){
   const plotSelect = $('plot');
@@ -247,7 +247,7 @@ function updateTotal(){
   const p = plots.find(x => x.code === plotSelect.value);
   const productLines = document.querySelectorAll('.product-line');
   productLines.forEach(line => {
-    const lineTotal = p?.area ? (Number(line.querySelector('.dose').value) || 0) * p.area : 0;
+    const lineTotal = p?.area ? (Number(line.querySelector('.total-used').value) || 0) / p.area : 0;
     const totalElement = line.querySelector('.line-total');
     if (totalElement) totalElement.textContent = formatNumber(lineTotal);
   });
@@ -257,7 +257,7 @@ function updateTotal(){
 async function saveApplication(event){
   event.preventDefault();
   const p=plots.find(x=>x.code===$('plot').value);
-  const products=[...document.querySelectorAll('.product-line')].map(line=>({product:line.querySelector('.product').value,unit:line.querySelector('.unit').value,dose:Number(line.querySelector('.dose').value)||0})).filter(item=>item.product);
+  const products=[...document.querySelectorAll('.product-line')].map(line=>({product:line.querySelector('.product').value,unit:line.querySelector('.unit').value,dose:p.area?(Number(line.querySelector('.total-used').value)||0)/p.area:0,totalUsed:Number(line.querySelector('.total-used').value)||0})).filter(item=>item.product);
   const item={date:$('date').value,plot:p.code,crop:p.crop,type:$('type').value,products,responsible:$('responsible').value,notes:$('notes').value,farm:currentFarm};
   try {
     const response = await fetch('/api/applications', {
@@ -293,6 +293,31 @@ async function clearHistory(){
     renderApplicationStatus();
   }
 }
+function renderHistory(selectedPlot='') {
+  const all = currentApplications();
+  $('application-count').textContent = all.length;
+  const plotsWithRecords = new Set(all.map(item => item.plot));
+  $('history-plots').innerHTML = plots.map(plot => `<button type="button" class="history-plot ${selectedPlot === plot.code ? 'selected ' : ''}${plotsWithRecords.has(plot.code) ? 'has-records' : ''}" data-code="${plot.code}"><strong>${plot.code}</strong><small>${formatNumber(plot.area)} ha · ${plot.crop}</small><span>${all.filter(item => item.plot === plot.code).length} registro(s)</span></button>`).join('');
+  $('history-plots').querySelectorAll('.history-plot').forEach(button => button.onclick = () => renderHistory(button.dataset.code));
+  if (!selectedPlot) {
+    $('history').className = 'history-empty';
+    $('history').innerHTML = 'Clique em um talhão para ver as aplicações detalhadas.<br><span>Cada lote tem seu próprio histórico.</span>';
+    return;
+  }
+  const plot = plots.find(item => item.code === selectedPlot);
+  const records = all.filter(item => item.plot === selectedPlot);
+  if (!records.length) {
+    $('history').className = 'history-empty';
+    $('history').innerHTML = `Nenhuma aplicação registrada no ${selectedPlot}.`;
+    return;
+  }
+  $('history').className = 'history-list';
+  $('history').innerHTML = `<div class="history-detail-heading"><div><span class="eyebrow">TALHÃO SELECIONADO</span><h3>${selectedPlot}</h3></div><strong>${formatNumber(plot.area)} ha · ${plot.crop}</strong></div>` + records.map(item => {
+    const products = item.products || [];
+    return `<article class="history-row"><small>${new Date(item.date + 'T12:00:00').toLocaleDateString('pt-BR')}</small><div><strong>${item.type || 'Aplicação'}</strong><small>${item.responsible || 'Sem responsável'}</small></div><div class="history-products">${products.map(product => { const dose = Number(product.dose) || 0; const total = dose * Number(plot.area || 0); const unit = product.unit || 'kg/ha'; return `<div class="history-product"><strong>${product.product || 'Produto não informado'}</strong><span>Quantidade por hectare: ${formatNumber(dose)} ${unit}</span><b>Total usado: ${formatNumber(total)} ${unit.replace('/ha', '')}</b></div>`; }).join('')}</div></article>`;
+  }).join('');
+}
+
 function excelCell(value){return `<Cell><Data ss:Type="String">${String(value??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</Data></Cell>`;}
 function excelSheet(name,headers,rows){return `<Worksheet ss:Name="${name.substring(0,31)}"><Table><Row>${headers.map(excelCell).join('')}</Row>${rows.map(row=>`<Row>${row.map(excelCell).join('')}</Row>`).join('')}</Table></Worksheet>`;}
 function exportSelectedPlotHistory(plotCode){const plot=plots.find(item=>item.code===plotCode);if(!plot)return;const all=applications().filter(item=>item.plot===plotCode);const rows=[];const products = all.flatMap(item => (item.products||[{product:item.product,unit:item.unit,dose:item.dose}]).map(product => ({product:product.product || 'Produto não informado', dose:Number(product.dose)||0, total: plot.area ? (Number(product.dose)||0) * plot.area : 0, unit: product.unit || 'kg/ha'})));if(!products.length){rows.push(['Sem registro',0,0]);}else{products.forEach(product=>rows.push([product.product,product.dose,product.total]));}const xml=`<?xml version="1.0"?><Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"><Styles><Style ss:ID="Default"><Font ss:FontName="Arial"/></Style></Styles>${excelSheet(plotCode,['Produto','Quantidade por bomba','Total usado'],rows)}</Workbook>`;const blob=new Blob([xml],{type:'application/vnd.ms-excel'});const link=document.createElement('a');link.href=URL.createObjectURL(blob);link.download=`${plotCode}-historico.xls`;link.click();URL.revokeObjectURL(link.href);} 

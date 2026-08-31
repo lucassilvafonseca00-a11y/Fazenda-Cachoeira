@@ -3,9 +3,37 @@ import os
 from pathlib import Path
 
 from flask import Flask, jsonify, request, send_file
+import psycopg
 
 BASE_DIR = Path(__file__).resolve().parent
 DATA_FILE = BASE_DIR / "shared_data.json"
+DATABASE_URL = os.environ.get("DATABASE_URL")
+
+
+def database_connection():
+    if not DATABASE_URL:
+        return None
+    return psycopg.connect(DATABASE_URL)
+
+
+def init_database():
+    if not DATABASE_URL:
+        return
+    with database_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS applications (
+                    id BIGSERIAL PRIMARY KEY,
+                    farm_id TEXT NOT NULL,
+                    payload JSONB NOT NULL,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                )
+                """
+            )
+            cursor.execute(
+                "CREATE INDEX IF NOT EXISTS applications_farm_id_idx ON applications (farm_id, id DESC)"
+            )
 
 
 def default_state():
@@ -45,11 +73,27 @@ def farm_key(farm_id):
 
 
 def get_farm_applications(farm_id):
+    if DATABASE_URL:
+        with database_connection() as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    "SELECT payload FROM applications WHERE farm_id = %s ORDER BY id DESC",
+                    (farm_id,),
+                )
+                return [row[0] for row in cursor.fetchall()]
     state = load_state()
     return state.get("farms", {}).get(farm_id, [])
 
 
 def save_farm_application(farm_id, payload):
+    if DATABASE_URL:
+        with database_connection() as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    "INSERT INTO applications (farm_id, payload) VALUES (%s, %s)",
+                    (farm_id, json.dumps(payload, ensure_ascii=False)),
+                )
+        return payload
     state = load_state()
     farm_data = state.setdefault("farms", {}).setdefault(farm_id, [])
     farm_data.insert(0, payload)
@@ -58,6 +102,11 @@ def save_farm_application(farm_id, payload):
 
 
 def delete_farm_applications(farm_id):
+    if DATABASE_URL:
+        with database_connection() as connection:
+            with connection.cursor() as cursor:
+                cursor.execute("DELETE FROM applications WHERE farm_id = %s", (farm_id,))
+        return []
     state = load_state()
     state.setdefault("farms", {})[farm_id] = []
     save_state(state)
@@ -66,6 +115,7 @@ def delete_farm_applications(farm_id):
 
 def create_app():
     app = Flask(__name__, static_folder=".", static_url_path="")
+    init_database()
 
     @app.get("/")
     def index():
