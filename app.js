@@ -258,9 +258,10 @@ async function saveApplication(event){
   const p=plots.find(x=>x.code===$('plot').value);
   const products=[...document.querySelectorAll('.product-line')].map(line=>({product:line.querySelector('.product').value,unit:line.querySelector('.unit').value,dose:Number(line.querySelector('.dose').value)||0,totalUsed:Number(line.querySelector('.total-used').value)||0})).filter(item=>item.product);
   const item={date:$('date').value,plot:p.code,crop:p.crop,type:$('type').value,products,responsible:$('responsible').value,notes:$('notes').value,farm:currentFarm};
+  const editingId = $('application-form').dataset.editingId;
   try {
-    const response = await fetch('/api/applications', {
-      method: 'POST',
+    const response = await fetch(editingId ? `/api/applications/${editingId}?farm=${encodeURIComponent(currentFarm)}` : '/api/applications', {
+      method: editingId ? 'PUT' : 'POST',
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify(item)
     });
@@ -271,6 +272,9 @@ async function saveApplication(event){
     return;
   }
   event.target.reset();
+  delete $('application-form').dataset.editingId;
+  document.querySelector('.form-panel h2').textContent = 'Nova aplicação';
+  document.querySelector('.primary-button').innerHTML = '<span>+</span> Registrar aplicação';
   $('product-lines').innerHTML=document.querySelector('.product-line').outerHTML;
   document.querySelector('.remove-product').hidden=true;
   bindProductLine(document.querySelector('.product-line'));
@@ -318,23 +322,22 @@ function renderHistory(selectedPlot='') {
   $('history').querySelectorAll('.edit-history-button').forEach(button => button.onclick = () => editApplication(Number(button.dataset.id), selectedPlot));
 }
 
-async function editApplication(applicationId, selectedPlot) {
+function editApplication(applicationId, selectedPlot) {
   const item = currentApplications().find(application => application._id === applicationId);
-  const product = item?.products?.[0];
-  if (!item || !product) return;
-  const name = prompt('Produto:', product.product || '');
-  if (name === null) return;
-  const dose = prompt('Quantidade hectare:', product.dose ?? '');
-  if (dose === null) return;
-  const total = prompt('Total usado:', product.totalUsed ?? '');
-  if (total === null) return;
-  const updated = {...item, products: [{...product, product: name.trim(), dose: Number(dose) || 0, totalUsed: Number(total) || 0}, ...item.products.slice(1)]};
-  const response = await fetch(`/api/applications/${applicationId}?farm=${encodeURIComponent(currentFarm)}`, {method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(updated)});
-  if (!response.ok) { alert('Não foi possível salvar a correção.'); return; }
-  await refreshFarmData();
-  renderHistory(selectedPlot);
-  renderApplicationStatus();
-  renderMap();
+  if (!item || !item.products?.length || publicView) return;
+  const form = $('application-form');
+  form.dataset.editingId = applicationId;
+  $('date').value = item.date || '';
+  $('plot').value = item.plot || '';
+  $('type').value = item.type || 'Defensivo';
+  $('responsible').value = item.responsible || '';
+  $('notes').value = item.notes || '';
+  $('product-lines').innerHTML = item.products.map((product, index) => `<div class="product-line"><div class="product-search"><input class="product" type="text" placeholder="Nome do produto" value="${String(product.product || '').replace(/"/g, '&quot;')}" required /></div><label class="product-field">Unidade<select class="unit"><option value="kg">kg</option><option value="L">L</option><option value="g">g</option><option value="mL">mL</option></select></label><label class="product-field">Total usado<input class="total-used" type="number" min="0" step="0.001" value="${product.totalUsed ?? ''}" required /></label><label class="product-field">Dose por hectare<input class="dose" type="number" min="0" step="0.001" value="${product.dose ?? ''}" required /></label><button class="remove-product" type="button" ${index ? '' : 'hidden'}>×</button></div>`).join('');
+  document.querySelectorAll('.product-line').forEach((line, index) => { line.querySelector('.unit').value = item.products[index].unit || 'L'; bindProductLine(line); line.querySelector('.remove-product').onclick = () => { line.remove(); updateTotal(); }; });
+  document.querySelector('.form-panel').scrollIntoView({behavior: 'smooth', block: 'start'});
+  document.querySelector('.form-panel h2').textContent = 'Editar aplicação';
+  document.querySelector('.primary-button').innerHTML = '<span>✓</span> Salvar alteração';
+  updateTotal();
 }
 
 function excelCell(value){return `<Cell><Data ss:Type="String">${String(value??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</Data></Cell>`;}
