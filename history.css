@@ -80,6 +80,28 @@
   padding-top: 10px;
 }
 
+.edit-history-button {
+  display: block;
+  margin-top: 12px;
+  border: 1px solid #b8d4c1;
+  border-radius: 7px;
+  padding: 6px 10px;
+  background: #f2f8f3;
+  color: #2c7655;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.edit-history-button:hover {
+  background: #e3f0e5;
+}
+
+.public-readonly .edit-history-button {
+  display: none;
+}
+
 @media (max-width: 720px) {
   .history-row {
     grid-template-columns: 1fr;

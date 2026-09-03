@@ -313,8 +313,28 @@ function renderHistory(selectedPlot='') {
   $('history').className = 'history-list';
   $('history').innerHTML = `<div class="history-detail-heading"><div><span class="eyebrow">TALHÃO SELECIONADO</span><h3>${selectedPlot}</h3></div><strong>${formatNumber(plot.area)} ha · ${plot.crop}</strong></div>` + records.map(item => {
     const products = item.products || [];
-    return `<article class="history-row"><small>${new Date(item.date + 'T12:00:00').toLocaleDateString('pt-BR')}</small><div><strong>${item.type || 'Aplicação'}</strong><small>${item.responsible || 'Sem responsável'}</small></div><div class="history-products"><table class="history-products-table"><thead><tr><th>Produto</th><th>Quantidade hectare</th><th>Total</th></tr></thead><tbody>${products.map(product => { const dose = Number(product.dose) || 0; const total = product.totalUsed ?? dose * Number(plot.area || 0); const unit = product.unit || 'kg'; return `<tr><td>${product.product || 'Produto não informado'}</td><td>${formatNumber(dose)} ${unit}/ha</td><td>${formatNumber(total)} ${unit}</td></tr>`; }).join('')}</tbody></table></div></article>`;
+    return `<article class="history-row"><small>${new Date(item.date + 'T12:00:00').toLocaleDateString('pt-BR')}</small><div><strong>${item.type || 'Aplicação'}</strong><small>${item.responsible || 'Sem responsável'}</small><button type="button" class="edit-history-button" data-id="${item._id || ''}">Editar</button></div><div class="history-products"><table class="history-products-table"><thead><tr><th>Produto</th><th>Quantidade hectare</th><th>Total</th></tr></thead><tbody>${products.map(product => { const dose = Number(product.dose) || 0; const total = product.totalUsed ?? dose * Number(plot.area || 0); const unit = product.unit || 'kg'; return `<tr><td>${product.product || 'Produto não informado'}</td><td>${formatNumber(dose)} ${unit}/ha</td><td>${formatNumber(total)} ${unit}</td></tr>`; }).join('')}</tbody></table></div></article>`;
   }).join('');
+  $('history').querySelectorAll('.edit-history-button').forEach(button => button.onclick = () => editApplication(Number(button.dataset.id), selectedPlot));
+}
+
+async function editApplication(applicationId, selectedPlot) {
+  const item = currentApplications().find(application => application._id === applicationId);
+  const product = item?.products?.[0];
+  if (!item || !product) return;
+  const name = prompt('Produto:', product.product || '');
+  if (name === null) return;
+  const dose = prompt('Quantidade hectare:', product.dose ?? '');
+  if (dose === null) return;
+  const total = prompt('Total usado:', product.totalUsed ?? '');
+  if (total === null) return;
+  const updated = {...item, products: [{...product, product: name.trim(), dose: Number(dose) || 0, totalUsed: Number(total) || 0}, ...item.products.slice(1)]};
+  const response = await fetch(`/api/applications/${applicationId}?farm=${encodeURIComponent(currentFarm)}`, {method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(updated)});
+  if (!response.ok) { alert('Não foi possível salvar a correção.'); return; }
+  await refreshFarmData();
+  renderHistory(selectedPlot);
+  renderApplicationStatus();
+  renderMap();
 }
 
 function excelCell(value){return `<Cell><Data ss:Type="String">${String(value??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</Data></Cell>`;}

@@ -77,10 +77,10 @@ def get_farm_applications(farm_id):
         with database_connection() as connection:
             with connection.cursor() as cursor:
                 cursor.execute(
-                    "SELECT payload FROM applications WHERE farm_id = %s ORDER BY id DESC",
+                    "SELECT id, payload FROM applications WHERE farm_id = %s ORDER BY id DESC",
                     (farm_id,),
                 )
-                return [row[0] for row in cursor.fetchall()]
+                return [{**row[1], "_id": row[0]} for row in cursor.fetchall()]
     state = load_state()
     return state.get("farms", {}).get(farm_id, [])
 
@@ -180,6 +180,24 @@ def create_app():
             return jsonify({"error": "payload vazio"}), 400
         saved = save_farm_application(farm_id, payload)
         return jsonify(saved), 201
+
+    @app.put("/api/applications/<int:application_id>")
+    def api_update_application(application_id):
+        payload = request.get_json(silent=True) or {}
+        if not payload:
+            return jsonify({"error": "payload vazio"}), 400
+        if DATABASE_URL:
+            farm_id = payload.get("farm") or request.args.get("farm", "cachoeira")
+            with database_connection() as connection:
+                with connection.cursor() as cursor:
+                    cursor.execute(
+                        "UPDATE applications SET payload = %s WHERE id = %s AND farm_id = %s RETURNING id",
+                        (json.dumps(payload, ensure_ascii=False), application_id, farm_id),
+                    )
+                    if cursor.fetchone() is None:
+                        return jsonify({"error": "registro não encontrado"}), 404
+            return jsonify({**payload, "_id": application_id})
+        return jsonify({"error": "edição requer banco PostgreSQL"}), 503
 
     @app.delete("/api/applications")
     def api_clear_applications():
