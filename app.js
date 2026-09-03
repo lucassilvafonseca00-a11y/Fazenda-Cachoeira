@@ -232,14 +232,14 @@ async function setup(){
   updateTotal();
   startBackgroundSync();
 }
-function bindProductLine(line){const product=line.querySelector('.product');product.oninput=updateTotal;line.querySelector('.total-used').oninput=updateTotal;}
+function bindProductLine(line){const product=line.querySelector('.product');product.oninput=updateTotal;line.querySelector('.total-used').oninput=updateTotal;line.querySelector('.dose').oninput=updateTotal;}
 function addProductLine(){const line=document.querySelector('.product-line').cloneNode(true);line.querySelectorAll('input').forEach(input=>input.value='');line.querySelector('.line-total').textContent='0,00';line.querySelector('.remove-product').hidden=false;line.querySelector('.remove-product').onclick=()=>{line.remove();updateTotal()};bindProductLine(line);line.querySelector('.product').focus();$('product-lines').appendChild(line);}
 function renderApplicationStatus(){const all=currentApplications();const today=new Date();const cards=plots.map(plot=>{const latest=all.filter(item=>item.plot===plot.code).sort((a,b)=>b.date.localeCompare(a.date))[0];if(!latest)return `<div class="status-card pending"><strong>${plot.code}</strong><small>Sem aplicação registrada</small></div>`;const appliedDate=new Date(`${latest.date}T12:00:00`);const days=Math.max(0,Math.floor((today-appliedDate)/86400000));const status=days>15?'overdue':'recent';return `<div class="status-card ${status}"><strong>${plot.code}</strong><small>${days===0?'Aplicado hoje':`Aplicado há ${days} dia(s)`}</small><span>${status==='overdue'?'Mais de 20 dias':'Dentro de 15 dias'}</span></div>`;}).join('');$('application-status').innerHTML='<div class="status-heading"><span>Status das aplicações</span></div><div class="status-grid">'+cards+'</div><div class="status-legend"><small><i class="status-dot recent"></i>Até 15 dias <i class="status-dot overdue"></i>Mais de 20 dias</small></div>';}
 function renderCatalogOptions(){const options=[...new Map(productCatalog.map(item=>[item.commercial,item])).values()];document.querySelectorAll('#product-options').forEach(list=>list.innerHTML=options.map(item=>`<option value="${item.commercial}">${item.active} · ${item.manufacturer}</option>`).join(''));document.querySelectorAll('.catalog-status').forEach(status=>status.textContent=productCatalog.length?`${options.length} produtos disponíveis para pesquisa.`:'Carregue a lista de produtos para pesquisar.');}
 function parseCatalog(text){return text.split(/\r?\n/).slice(1).map(line=>line.split(';')).filter(parts=>parts.length>=3&&parts[0].trim()).map(parts=>({commercial:parts[0].trim(),active:parts[1].trim().replace(/�/g,'í'),manufacturer:parts[2].trim()}));}
 function loadCatalog(event){const file=event.target.files[0];if(!file)return;const reader=new FileReader();reader.onload=()=>{const text=new TextDecoder('windows-1252').decode(reader.result);productCatalog=parseCatalog(text);localStorage.setItem(catalogKey,JSON.stringify(productCatalog));renderCatalogOptions();};reader.onerror=()=>document.querySelectorAll('.catalog-status').forEach(status=>status.textContent='Não foi possível ler o arquivo CSV.');reader.readAsArrayBuffer(file);}
 function loadDefaultCatalog(){if(productCatalog.length)return;fetch('lista-produtos.csv').then(response=>response.ok?response.arrayBuffer():Promise.reject()).then(buffer=>{const text=new TextDecoder('windows-1252').decode(buffer);productCatalog=parseCatalog(text);if(!productCatalog.length)throw new Error('Catálogo vazio');localStorage.setItem(catalogKey,JSON.stringify(productCatalog));renderCatalogOptions();}).catch(()=>{productCatalog=starterCatalog;renderCatalogOptions();});}
-function renderApplicationCheck(){const p=plots.find(x=>x.code===$('plot').value);const area=p?.area||0;const rows=[...document.querySelectorAll('.product-line')].map(line=>{const name=line.querySelector('.product').value.trim()||'Produto não informado';const unit=line.querySelector('.unit').value;const total=Number(line.querySelector('.total-used').value)||0;const dose=area?total/area:0;return `<div class="check-row"><strong>${name}</strong><span>Total usado: ${formatNumber(total)} ${unit}</span><span>${formatNumber(total)} ${unit} ÷ ${formatNumber(area)} ha = <b>${formatNumber(dose)} ${unit}/ha</b></span></div>`;}).join('');$('application-check').innerHTML=`<div class="check-heading"><strong>Conferência</strong><small>${p?`${p.code} · ${formatNumber(area)} ha`:'Selecione um talhão'}</small></div>${rows||'<small>Adicione um produto para conferir as quantidades.</small>'}`;}
+function renderApplicationCheck(){const p=plots.find(x=>x.code===$('plot').value);const rows=[...document.querySelectorAll('.product-line')].map(line=>{const name=line.querySelector('.product').value.trim()||'Produto não informado';const unit=line.querySelector('.unit').value;const total=Number(line.querySelector('.total-used').value)||0;const dose=Number(line.querySelector('.dose').value)||0;return `<div class="check-row"><strong>${name}</strong><span>Total usado: ${formatNumber(total)} ${unit}</span><span>Dose por hectare: <b>${formatNumber(dose)} ${unit}/ha</b></span></div>`;}).join('');$('application-check').innerHTML=`<div class="check-heading"><strong>Conferência</strong><small>${p?`${p.code} · ${formatNumber(p.area)} ha`:'Selecione um talhão'}</small></div>${rows||'<small>Adicione um produto para conferir as quantidades.</small>'}`;}
 function toggleApplicationCheck(){const panel=$('application-check');panel.hidden=!panel.hidden;if(!panel.hidden)renderApplicationCheck();}
 function updateTotal(){
   const plotSelect = $('plot');
@@ -247,9 +247,8 @@ function updateTotal(){
   const p = plots.find(x => x.code === plotSelect.value);
   const productLines = document.querySelectorAll('.product-line');
   productLines.forEach(line => {
-    const lineTotal = p?.area ? (Number(line.querySelector('.total-used').value) || 0) / p.area : 0;
     const totalElement = line.querySelector('.line-total');
-    if (totalElement) totalElement.textContent = formatNumber(lineTotal);
+    if (totalElement) totalElement.textContent = formatNumber(Number(line.querySelector('.dose').value) || 0);
   });
   const applicationCheck = $('application-check');
   if (applicationCheck && !applicationCheck.hidden) renderApplicationCheck();
@@ -257,7 +256,7 @@ function updateTotal(){
 async function saveApplication(event){
   event.preventDefault();
   const p=plots.find(x=>x.code===$('plot').value);
-  const products=[...document.querySelectorAll('.product-line')].map(line=>({product:line.querySelector('.product').value,unit:line.querySelector('.unit').value,dose:p.area?(Number(line.querySelector('.total-used').value)||0)/p.area:0,totalUsed:Number(line.querySelector('.total-used').value)||0})).filter(item=>item.product);
+  const products=[...document.querySelectorAll('.product-line')].map(line=>({product:line.querySelector('.product').value,unit:line.querySelector('.unit').value,dose:Number(line.querySelector('.dose').value)||0,totalUsed:Number(line.querySelector('.total-used').value)||0})).filter(item=>item.product);
   const item={date:$('date').value,plot:p.code,crop:p.crop,type:$('type').value,products,responsible:$('responsible').value,notes:$('notes').value,farm:currentFarm};
   try {
     const response = await fetch('/api/applications', {

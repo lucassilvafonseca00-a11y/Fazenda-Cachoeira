@@ -1,0 +1,95 @@
+.history-products {
+  width: 100%;
+  margin-top: 18px;
+  overflow-x: auto;
+}
+
+.history-products-table {
+  width: 100%;
+  min-width: 560px;
+  border-collapse: separate;
+  border-spacing: 0;
+  overflow: hidden;
+  border: 1px solid #d8e5dc;
+  border-radius: 12px;
+  background: #fbfdf9;
+  box-shadow: 0 8px 20px rgba(25, 53, 43, 0.06);
+  table-layout: fixed;
+}
+
+.history-products-table th,
+.history-products-table td {
+  padding: 13px 16px;
+  text-align: left;
+  vertical-align: middle;
+  border-bottom: 1px solid #e5eee7;
+}
+
+.history-products-table th {
+  background: #edf5ee;
+  color: #2c7655;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.history-products-table th:nth-child(1),
+.history-products-table td:nth-child(1) { width: 46%; }
+.history-products-table th:nth-child(2),
+.history-products-table td:nth-child(2) { width: 29%; }
+.history-products-table th:nth-child(3),
+.history-products-table td:nth-child(3) { width: 25%; }
+
+.history-products-table td {
+  color: #23483a;
+  font-size: 14px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.history-products-table td:nth-child(2),
+.history-products-table td:nth-child(3) {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.history-products-table td:last-child {
+  color: #2c7655;
+  font-weight: 700;
+}
+
+.history-products-table tr:last-child td { border-bottom: 0; }
+
+.history-row {
+  display: grid;
+  grid-template-columns: 125px minmax(150px, 0.45fr) minmax(0, 1.55fr);
+  align-items: start;
+  gap: 22px;
+  padding: 24px 0;
+  border-bottom: 1px solid #dce5df;
+}
+
+.history-row > small {
+  color: #718078;
+  font-weight: 600;
+  padding-top: 14px;
+}
+
+.history-row > div:nth-child(2) {
+  padding-top: 10px;
+}
+
+@media (max-width: 720px) {
+  .history-row {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .history-row > small,
+  .history-row > div:nth-child(2) { padding-top: 0; }
+
+  .history-products-table {
+    min-width: 500px;
+  }
+}
