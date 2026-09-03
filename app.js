@@ -136,6 +136,7 @@ const starterCatalog=[
 ];
 let productCatalog=JSON.parse(localStorage.getItem(getCatalogKey())||'null')||starterCatalog;
 const formatNumber = (n, digits=2) => Number(n).toLocaleString('pt-BR',{minimumFractionDigits:digits,maximumFractionDigits:digits});
+const displayUnit = unit => unit === 'g' ? 'gr' : unit;
 const normalizeText = (value='') => String(value).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();
 const formatCropLabel = crop => {
   const value = normalizeText(crop || '').replace(/\s+/g, '');
@@ -317,7 +318,7 @@ function renderHistory(selectedPlot='') {
   $('history').className = 'history-list';
   $('history').innerHTML = `<div class="history-detail-heading"><div><span class="eyebrow">TALHÃO SELECIONADO</span><h3>${selectedPlot}</h3></div><strong>${formatNumber(plot.area)} ha · ${plot.crop}</strong></div>` + records.map(item => {
     const products = item.products || [];
-    return `<article class="history-row"><small>${new Date(item.date + 'T12:00:00').toLocaleDateString('pt-BR')}</small><div><strong>${item.type || 'Aplicação'}</strong><small>${item.responsible || 'Sem responsável'}</small><button type="button" class="edit-history-button" data-id="${item._id || ''}">Editar</button></div><div class="history-products"><table class="history-products-table"><thead><tr><th>Produto</th><th>Quantidade hectare</th><th>Total</th></tr></thead><tbody>${products.map(product => { const dose = Number(product.dose) || 0; const total = product.totalUsed ?? dose * Number(plot.area || 0); const unit = product.unit || 'kg'; return `<tr><td>${product.product || 'Produto não informado'}</td><td>${formatNumber(dose)} ${unit}/ha</td><td>${formatNumber(total)} ${unit}</td></tr>`; }).join('')}</tbody></table></div></article>`;
+    return `<article class="history-row"><small>${new Date(item.date + 'T12:00:00').toLocaleDateString('pt-BR')}</small><div><strong>${item.type || 'Aplicação'}</strong><small>${item.responsible || 'Sem responsável'}</small><button type="button" class="edit-history-button" data-id="${item._id || ''}">Editar</button></div><div class="history-products"><table class="history-products-table"><thead><tr><th>Produto</th><th>Quantidade hectare</th><th>Total</th></tr></thead><tbody>${products.map(product => { const dose = Number(product.dose) || 0; const total = product.totalUsed ?? dose * Number(plot.area || 0); const unit = displayUnit(product.unit || 'kg'); return `<tr><td>${product.product || 'Produto não informado'}</td><td>${formatNumber(dose)} ${unit}/ha</td><td>${formatNumber(total)} ${unit}</td></tr>`; }).join('')}</tbody></table></div></article>`;
   }).join('');
   $('history').querySelectorAll('.edit-history-button').forEach(button => button.onclick = () => editApplication(Number(button.dataset.id), selectedPlot));
 }
